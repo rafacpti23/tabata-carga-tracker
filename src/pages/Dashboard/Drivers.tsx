@@ -1,6 +1,7 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Driver } from "@/lib/types";
+import { supabase } from "@/integrations/supabase/client";
 import { DataTable } from "@/components/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,40 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-
-// Sample data for demonstration
-const mockDrivers: Driver[] = [
-  {
-    id: '1',
-    nome: 'João Silva',
-    cpf: '123.456.789-00',
-    placa_cavalo: 'ABC-1234',
-    telefone: '(11) 98765-4321',
-    ultima_lat: -23.550520,
-    ultima_lng: -46.633309,
-    atualizado_em: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    nome: 'Maria Oliveira',
-    cpf: '234.567.890-11',
-    placa_cavalo: 'DEF-5678',
-    telefone: '(11) 91234-5678',
-    ultima_lat: -23.555,
-    ultima_lng: -46.640,
-    atualizado_em: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    nome: 'Pedro Santos',
-    cpf: '345.678.901-22',
-    placa_cavalo: 'GHI-9012',
-    telefone: '(11) 99876-5432',
-    ultima_lat: null,
-    ultima_lng: null,
-    atualizado_em: new Date(Date.now() - 86400000).toISOString(),
-  }
-];
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Drivers() {
   const [searchText, setSearchText] = useState("");
@@ -62,8 +31,44 @@ export default function Drivers() {
     placa_cavalo: "",
     telefone: ""
   });
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'operator';
 
-  const filteredDrivers = mockDrivers.filter(
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('motoristas')
+          .select('*');
+
+        if (error) {
+          toast({
+            variant: "destructive",
+            title: "Erro ao carregar motoristas",
+            description: error.message
+          });
+          return;
+        }
+
+        setDrivers(data as Driver[]);
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar motoristas",
+          description: error.message
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDrivers();
+  }, []);
+
+  const filteredDrivers = drivers.filter(
     (driver) =>
       driver.nome.toLowerCase().includes(searchText.toLowerCase()) ||
       driver.cpf.includes(searchText) ||
@@ -80,27 +85,57 @@ export default function Drivers() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would send data to the backend
-    console.log("Submitted:", formData);
-    setIsAddDialogOpen(false);
-    // Reset form
-    setFormData({
-      nome: "",
-      cpf: "",
-      placa_cavalo: "",
-      telefone: ""
-    });
+    
+    try {
+      const { data, error } = await supabase
+        .from('motoristas')
+        .insert([formData])
+        .select();
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao adicionar motorista",
+          description: error.message
+        });
+        return;
+      }
+
+      setDrivers(prev => [...prev, data[0] as Driver]);
+      setIsAddDialogOpen(false);
+      
+      toast({
+        title: "Motorista adicionado",
+        description: "O motorista foi adicionado com sucesso."
+      });
+      
+      // Reset form
+      setFormData({
+        nome: "",
+        cpf: "",
+        placa_cavalo: "",
+        telefone: ""
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao adicionar motorista",
+        description: error.message
+      });
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold tracking-tight">Motoristas</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Novo Motorista
-        </Button>
+        {canEdit && (
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Novo Motorista
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -158,6 +193,7 @@ export default function Drivers() {
               },
             ]}
             onRowClick={handleDriverClick}
+            isLoading={isLoading}
           />
         </CardContent>
       </Card>
@@ -271,7 +307,9 @@ export default function Drivers() {
                 <div className="flex flex-col space-y-1">
                   <span className="text-sm text-gray-500">Última Atualização</span>
                   <span>
-                    {format(new Date(selectedDriver.atualizado_em), "dd/MM/yyyy HH:mm")}
+                    {selectedDriver.atualizado_em ? 
+                      format(new Date(selectedDriver.atualizado_em), "dd/MM/yyyy HH:mm") : 
+                      'N/A'}
                   </span>
                 </div>
               </div>

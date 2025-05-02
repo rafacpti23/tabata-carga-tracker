@@ -1,74 +1,160 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@/lib/types';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { User, AuthData } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
-interface AuthContextType {
-  user: User | null;
-  isLoggedIn: boolean;
+interface AuthContextType extends AuthData {
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isLoggedIn: false,
+  login: async () => {},
+  logout: async () => {},
+  loading: true,
+});
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Simulate checking for existing session on load
   useEffect(() => {
-    const storedUser = localStorage.getItem('tabata_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsLoggedIn(true);
-    }
-    setLoading(false);
+    // Check current session
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error checking session:", error);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
+        if (session) {
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+            
+          if (profileError) {
+            console.error("Error fetching profile:", profileError);
+            setUser(null);
+          } else {
+            setUser({
+              id: session.user.id,
+              email: session.user.email || "",
+              role: profile.role as 'admin' | 'operator' | 'viewer',
+            });
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+
+    // Subscribe to auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session) {
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+            
+          if (profileError) {
+            console.error("Error fetching profile:", profileError);
+            setUser(null);
+          } else {
+            setUser({
+              id: session.user.id,
+              email: session.user.email || "",
+              role: profile.role as 'admin' | 'operator' | 'viewer',
+            });
+          }
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  // Mock login - replace with Supabase integration later
   const login = async (email: string, password: string) => {
-    // Simulate API call for authentication
-    setLoading(true);
-    
-    // For demo purposes - in production use Supabase authentication
-    if (email && password) {
-      // Mock successful authentication
-      const mockUser: User = {
-        id: '1',
-        email: email,
-        role: email.includes('admin') ? 'admin' : email.includes('operator') ? 'operator' : 'viewer'
-      };
-      
-      // Save to local storage for persistence
-      localStorage.setItem('tabata_user', JSON.stringify(mockUser));
-      setUser(mockUser);
-      setIsLoggedIn(true);
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao fazer login",
+          description: error.message,
+        });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao fazer login",
+        description: "Ocorreu um erro ao tentar fazer login.",
+      });
+    } finally {
       setLoading(false);
-    } else {
-      setLoading(false);
-      throw new Error('Invalid credentials');
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('tabata_user');
-    setUser(null);
-    setIsLoggedIn(false);
+  const logout = async () => {
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao sair",
+        description: "Ocorreu um erro ao tentar sair.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoggedIn: !!user,
+        login,
+        logout,
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

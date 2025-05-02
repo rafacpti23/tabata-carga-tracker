@@ -13,12 +13,14 @@ export interface Driver {
 export interface Cargo {
   id: string;
   motorista_id: string;
+  numero_conhecimento: string;
   local_carregamento: string;
   hora_inicio: string;
   km_inicial: number;
   local_descarga: string;
   hora_descarga: string | null;
   foto_canhoto_url: string | null;
+  valor_viagem: number;
   criado_em: string;
   status: 'loading' | 'in_transit' | 'delivered';
 }

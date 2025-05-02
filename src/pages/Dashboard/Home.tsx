@@ -1,129 +1,182 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatsCards } from '@/components/StatsCards';
 import { DataTable } from '@/components/DataTable';
 import { DriversMap } from '@/components/DriversMap';
 import { TabsContent, Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cargo, Driver } from '@/lib/types';
-import { Package, Truck, BarChart3, Map } from 'lucide-react';
+import { Package, Truck, BarChart3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-// Sample data for demonstration
-const mockDrivers: Driver[] = [
-  {
-    id: '1',
-    nome: 'João Silva',
-    cpf: '123.456.789-00',
-    placa_cavalo: 'ABC-1234',
-    telefone: '(11) 98765-4321',
-    ultima_lat: -23.550520,
-    ultima_lng: -46.633309,
-    atualizado_em: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    nome: 'Maria Oliveira',
-    cpf: '234.567.890-11',
-    placa_cavalo: 'DEF-5678',
-    telefone: '(11) 91234-5678',
-    ultima_lat: -23.555,
-    ultima_lng: -46.640,
-    atualizado_em: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    nome: 'Pedro Santos',
-    cpf: '345.678.901-22',
-    placa_cavalo: 'GHI-9012',
-    telefone: '(11) 99876-5432',
-    ultima_lat: null,
-    ultima_lng: null,
-    atualizado_em: new Date(Date.now() - 86400000).toISOString(),
-  }
-];
-
-const mockCargos: Cargo[] = [
-  {
-    id: '1',
-    motorista_id: '1',
-    local_carregamento: 'São Paulo, SP',
-    hora_inicio: new Date(Date.now() - 3600000).toISOString(),
-    km_inicial: 12500,
-    local_descarga: 'Campinas, SP',
-    hora_descarga: null,
-    foto_canhoto_url: null,
-    criado_em: new Date(Date.now() - 3600000).toISOString(),
-    status: 'in_transit',
-  },
-  {
-    id: '2',
-    motorista_id: '2',
-    local_carregamento: 'Rio de Janeiro, RJ',
-    hora_inicio: new Date(Date.now() - 7200000).toISOString(),
-    km_inicial: 45700,
-    local_descarga: 'São Paulo, SP',
-    hora_descarga: null,
-    foto_canhoto_url: null,
-    criado_em: new Date(Date.now() - 7200000).toISOString(),
-    status: 'in_transit',
-  },
-  {
-    id: '3',
-    motorista_id: '3',
-    local_carregamento: 'Curitiba, PR',
-    hora_inicio: new Date(Date.now() - 86400000).toISOString(),
-    km_inicial: 23400,
-    local_descarga: 'Florianópolis, SC',
-    hora_descarga: new Date().toISOString(),
-    foto_canhoto_url: 'https://example.com/canhoto.jpg',
-    criado_em: new Date(Date.now() - 86400000).toISOString(),
-    status: 'delivered',
-  }
-];
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 export default function Home() {
   const [filterText, setFilterText] = useState("");
-
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch drivers
+        const { data: driversData, error: driversError } = await supabase
+          .from('motoristas')
+          .select('*');
+        
+        if (driversError) {
+          toast({
+            variant: "destructive",
+            title: "Erro ao carregar motoristas",
+            description: driversError.message
+          });
+          return;
+        }
+        
+        // Fetch cargos
+        const { data: cargosData, error: cargosError } = await supabase
+          .from('cargas')
+          .select('*')
+          .order('criado_em', { ascending: false });
+        
+        if (cargosError) {
+          toast({
+            variant: "destructive",
+            title: "Erro ao carregar cargas",
+            description: cargosError.message
+          });
+          return;
+        }
+        
+        setDrivers(driversData as Driver[]);
+        setCargos(cargosData as Cargo[]);
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar dados",
+          description: error.message
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+    
+    // Set up real-time subscription for driver location updates
+    const driversSubscription = supabase
+      .channel('motoristas-changes')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'motoristas'
+      }, (payload) => {
+        // Update the driver in our state
+        setDrivers(currentDrivers => {
+          const updatedDriver = payload.new as Driver;
+          return currentDrivers.map(driver => 
+            driver.id === updatedDriver.id ? updatedDriver : driver
+          );
+        });
+      })
+      .subscribe();
+      
+    // Set up real-time subscription for cargos updates
+    const cargosSubscription = supabase
+      .channel('cargas-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cargas'
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          // Add new cargo to state
+          setCargos(currentCargos => [payload.new as Cargo, ...currentCargos]);
+        } else if (payload.eventType === 'UPDATE') {
+          // Update cargo in state
+          setCargos(currentCargos => {
+            const updatedCargo = payload.new as Cargo;
+            return currentCargos.map(cargo => 
+              cargo.id === updatedCargo.id ? updatedCargo : cargo
+            );
+          });
+        }
+      })
+      .subscribe();
+    
+    return () => {
+      driversSubscription.unsubscribe();
+      cargosSubscription.unsubscribe();
+    };
+  }, []);
+  
+  const driversActive = drivers.length;
+  const driversOnline = drivers.filter(d => d.ultima_lat && d.ultima_lng).length;
+  const cargosInTransit = cargos.filter(c => c.status === 'in_transit').length;
+  const cargosDeliveredToday = cargos.filter(c => {
+    if (c.status !== 'delivered' || !c.hora_descarga) return false;
+    const today = new Date();
+    const descargaDate = new Date(c.hora_descarga);
+    return (
+      descargaDate.getDate() === today.getDate() &&
+      descargaDate.getMonth() === today.getMonth() &&
+      descargaDate.getFullYear() === today.getFullYear()
+    );
+  }).length;
+  
+  // Calculate stats
+  const totalCargas = cargos.length;
+  const inTransitPercentage = totalCargas > 0 ? (cargosInTransit / totalCargas) * 100 : 0;
+  const deliveredTodayPercentage = totalCargas > 0 ? (cargosDeliveredToday / totalCargas) * 100 : 0;
+  
   const stats = [
     {
       title: "Motoristas Ativos",
-      value: "3",
+      value: driversActive.toString(),
       description: "Total de motoristas registrados",
       icon: <Truck size={16} />,
-      footer: "2 em trânsito",
+      footer: `${driversOnline} online`,
       trend: 0,
       color: "border-tabata-600"
     },
     {
       title: "Cargas em Trânsito",
-      value: "2",
+      value: cargosInTransit.toString(),
       description: "Cargas sendo transportadas",
       icon: <Package size={16} />,
-      progress: 67,
-      footer: "67% das cargas",
+      progress: Math.round(inTransitPercentage),
+      footer: `${Math.round(inTransitPercentage)}% das cargas`,
       trend: 1,
       color: "border-cargo-600"
     },
     {
       title: "Entregas Hoje",
-      value: "1",
+      value: cargosDeliveredToday.toString(),
       description: "Cargas entregues hoje",
-      progress: 33,
-      footer: "33% das cargas",
+      progress: Math.round(deliveredTodayPercentage),
+      footer: `${Math.round(deliveredTodayPercentage)}% das cargas`,
       trend: 1,
       color: "border-green-600"
     },
     {
-      title: "Km Total Percorrido",
-      value: "450",
-      description: "Quilômetros percorridos hoje",
+      title: "Total de Cargas",
+      value: totalCargas.toString(),
+      description: "Cargas registradas no sistema",
       icon: <BarChart3 size={16} />,
-      footer: "+120 que ontem",
+      footer: "Total acumulado",
       trend: 1,
       color: "border-blue-600"
     }
   ];
+  
+  // Function to get driver name
+  const getDriverName = (id: string) => {
+    const driver = drivers.find(d => d.id === id);
+    return driver ? driver.nome : 'N/A';
+  };
 
   return (
     <div className="space-y-6">
@@ -148,15 +201,17 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <DataTable
-                    data={mockCargos.filter(c => c.status === 'in_transit')}
+                    data={cargos.filter(c => c.status === 'in_transit')}
                     columns={[
                       {
                         key: 'motorista',
                         header: 'Motorista',
-                        cell: (cargo) => {
-                          const driver = mockDrivers.find(d => d.id === cargo.motorista_id);
-                          return driver ? driver.nome : 'N/A';
-                        }
+                        cell: (cargo) => getDriverName(cargo.motorista_id)
+                      },
+                      {
+                        key: 'conhecimento',
+                        header: 'Conhecimento',
+                        cell: (cargo) => cargo.numero_conhecimento
                       },
                       {
                         key: 'origem',
@@ -183,6 +238,7 @@ export default function Home() {
                       onChange: setFilterText,
                       placeholder: "Filtrar cargas..."
                     }}
+                    isLoading={isLoading}
                   />
                 </CardContent>
               </Card>
@@ -195,15 +251,17 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <DataTable
-                    data={mockCargos.filter(c => c.status === 'delivered')}
+                    data={cargos.filter(c => c.status === 'delivered')}
                     columns={[
                       {
                         key: 'motorista',
                         header: 'Motorista',
-                        cell: (cargo) => {
-                          const driver = mockDrivers.find(d => d.id === cargo.motorista_id);
-                          return driver ? driver.nome : 'N/A';
-                        }
+                        cell: (cargo) => getDriverName(cargo.motorista_id)
+                      },
+                      {
+                        key: 'conhecimento',
+                        header: 'Conhecimento',
+                        cell: (cargo) => cargo.numero_conhecimento
                       },
                       {
                         key: 'origem',
@@ -230,6 +288,7 @@ export default function Home() {
                       onChange: setFilterText,
                       placeholder: "Filtrar cargas..."
                     }}
+                    isLoading={isLoading}
                   />
                 </CardContent>
               </Card>
@@ -238,7 +297,7 @@ export default function Home() {
         </div>
 
         <Card className="h-[400px]">
-          <DriversMap drivers={mockDrivers} />
+          <DriversMap drivers={drivers} />
         </Card>
       </div>
     </div>
