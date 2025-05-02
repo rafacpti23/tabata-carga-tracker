@@ -16,7 +16,7 @@ export default function Login() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <img 
-              src="/truck-logo.png" 
+              src="https://tobematransportadora.com.br/wp-content/uploads/2020/02/logo-do-rodape.png" 
               alt="Logo Tabata Transportes" 
               className="h-20 w-auto"
               onError={(e) => {

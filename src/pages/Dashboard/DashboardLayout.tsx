@@ -13,6 +13,7 @@ import {
   X
 } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
@@ -29,7 +30,7 @@ export default function DashboardLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col md:flex-row">
       {/* Mobile sidebar toggle */}
       <div className="md:hidden flex items-center p-4 bg-tabata-800 text-white">
         <Button 
@@ -51,7 +52,17 @@ export default function DashboardLayout() {
       >
         {/* Logo */}
         <div className="hidden md:flex p-4 border-b border-tabata-700">
-          <h1 className="text-xl font-bold">Tabata Transportes</h1>
+          <div className="flex flex-col items-center w-full">
+            <img 
+              src="https://tobematransportadora.com.br/wp-content/uploads/2020/02/logo-do-rodape.png" 
+              alt="Logo Tabata Transportes" 
+              className="h-12 w-auto mb-2"
+              onError={(e) => {
+                e.currentTarget.src = "https://placehold.co/200x100/tabata/white?text=Tabata";
+              }}
+            />
+            <h1 className="text-xl font-bold">Tabata Transportes</h1>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -116,19 +127,22 @@ export default function DashboardLayout() {
             </div>
           </div>
           
-          <Button 
-            variant="outline" 
-            className="w-full text-white border-tabata-600 hover:bg-tabata-700 hover:text-white"
-            onClick={handleLogout}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </Button>
+          <div className="flex justify-between items-center mb-2">
+            <ThemeToggle />
+            <Button 
+              variant="outline" 
+              className="w-3/4 text-white border-tabata-600 hover:bg-tabata-700 hover:text-white"
+              onClick={handleLogout}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </Button>
+          </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto dark:bg-gray-900 dark:text-gray-100">
         {/* Mobile overlay when sidebar is open */}
         {sidebarOpen && (
           <div 

@@ -1,237 +1,198 @@
 
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.5'
 
 interface WhatsAppMessage {
-  from: string;
-  body: string;
-  type: string;
-  timestamp: string;
-  latitude?: number;
-  longitude?: number;
-  media_url?: string;
+  from: string
+  id: string
+  timestamp: string
+  type: string
+  text?: {
+    body: string
+  }
+  location?: {
+    latitude: number
+    longitude: number
+    name?: string
+    address?: string
+  }
+  image?: {
+    id: string
+    mime_type: string
+    sha256: string
+    caption?: string
+  }
+}
+
+interface WhatsAppPayload {
+  object: string
+  entry: Array<{
+    id: string
+    changes: Array<{
+      value: {
+        messaging_product: string
+        metadata: {
+          display_phone_number: string
+          phone_number_id: string
+        }
+        contacts: Array<{
+          profile: {
+            name: string
+          }
+          wa_id: string
+        }>
+        messages: WhatsAppMessage[]
+      }
+      field: string
+    }>
+  }>
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    if (req.method === 'POST') {
-      const data = await req.json();
-      console.log("Received webhook data:", JSON.stringify(data));
-
-      // Extract the message data
-      const message: WhatsAppMessage = data.message;
-
-      // Skip if not a valid message
-      if (!message || !message.from || !message.body) {
-        return new Response(JSON.stringify({ success: false, error: "Invalid message format" }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        });
-      }
-
-      // Get the driver based on the phone number
-      const { data: drivers, error: driverError } = await supabaseClient
-        .from('motoristas')
-        .select('*')
-        .eq('telefone', message.from)
-        .maybeSingle();
-
-      if (driverError) {
-        console.error("Error fetching driver:", driverError);
-        return new Response(JSON.stringify({ success: false, error: driverError.message }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        });
-      }
-
-      if (!drivers) {
-        return new Response(JSON.stringify({ success: false, error: "Driver not found" }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404,
-        });
-      }
-
-      // Process location updates
-      if (message.type === 'location' && message.latitude && message.longitude) {
-        const { error: updateError } = await supabaseClient
-          .from('motoristas')
-          .update({
-            ultima_lat: message.latitude,
-            ultima_lng: message.longitude,
-            atualizado_em: new Date().toISOString()
-          })
-          .eq('id', drivers.id);
-
-        if (updateError) {
-          console.error("Error updating location:", updateError);
-          return new Response(JSON.stringify({ success: false, error: updateError.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
-          });
-        }
-
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      }
-
-      // Process cargo updates
-      else if (message.body.toLowerCase().includes('carreg')) {
-        const infoRegex = /carreg[^:]*:\s*([^,]+),\s*([^,]+)/i;
-        const match = message.body.match(infoRegex);
-
-        if (match && match.length >= 3) {
-          const local_carregamento = match[1].trim();
-          const numeroConhecimento = match[2].trim();
-          
-          // Create a new cargo entry
-          const { error: cargoError } = await supabaseClient
-            .from('cargas')
-            .insert({
-              motorista_id: drivers.id,
-              numero_conhecimento: numeroConhecimento,
-              local_carregamento: local_carregamento,
-              local_descarga: 'A confirmar',
-              km_inicial: 0,
-              valor_viagem: 0,
-              status: 'loading'
-            });
-
-          if (cargoError) {
-            console.error("Error creating cargo:", cargoError);
-            return new Response(JSON.stringify({ success: false, error: cargoError.message }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 500,
-            });
-          }
-
-          return new Response(JSON.stringify({ success: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
-        }
-      }
-
-      // Process delivery updates
-      else if (message.body.toLowerCase().includes('descarg')) {
-        const infoRegex = /descarg[^:]*:\s*([^,]+),\s*([^,]+)/i;
-        const match = message.body.match(infoRegex);
-
-        if (match && match.length >= 3) {
-          const local_descarga = match[1].trim();
-          const numeroConhecimento = match[2].trim();
-          
-          // Update the cargo entry
-          const { error: cargoError } = await supabaseClient
-            .from('cargas')
-            .update({
-              local_descarga: local_descarga,
-              hora_descarga: new Date().toISOString(),
-              status: 'delivered'
-            })
-            .eq('numero_conhecimento', numeroConhecimento)
-            .eq('motorista_id', drivers.id);
-
-          if (cargoError) {
-            console.error("Error updating cargo:", cargoError);
-            return new Response(JSON.stringify({ success: false, error: cargoError.message }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 500,
-            });
-          }
-
-          return new Response(JSON.stringify({ success: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
-        }
-      }
-
-      // Process receipt photo uploads
-      else if (message.type === 'image' && message.media_url) {
-        // Find the most recent cargo for this driver that's in transit or delivered
-        const { data: cargos, error: cargoError } = await supabaseClient
-          .from('cargas')
-          .select('*')
-          .eq('motorista_id', drivers.id)
-          .in('status', ['in_transit', 'delivered'])
-          .order('criado_em', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (cargoError) {
-          console.error("Error fetching cargo:", cargoError);
-          return new Response(JSON.stringify({ success: false, error: cargoError.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
-          });
-        }
-
-        if (!cargos) {
-          return new Response(JSON.stringify({ success: false, error: "No active cargo found" }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404,
-          });
-        }
-
-        // Update the cargo with the photo URL
-        const { error: updateError } = await supabaseClient
-          .from('cargas')
-          .update({
-            foto_canhoto_url: message.media_url,
-            status: 'delivered'
-          })
-          .eq('id', cargos.id);
-
-        if (updateError) {
-          console.error("Error updating cargo with photo:", updateError);
-          return new Response(JSON.stringify({ success: false, error: updateError.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
-          });
-        }
-
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      }
-
-      return new Response(JSON.stringify({ success: false, message: "No action taken" }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+    // Verificar se é uma requisição de verificação do webhook
+    const url = new URL(req.url)
+    const mode = url.searchParams.get('hub.mode')
+    const token = url.searchParams.get('hub.verify_token')
+    const challenge = url.searchParams.get('hub.challenge')
+    
+    const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN') || 'tabata_webhook_token'
+    
+    // Responder à verificação do webhook
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('Webhook verificado!')
+      return new Response(challenge, { status: 200 })
     }
 
-    return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 405,
-    });
+    // Se não for uma verificação, processar a mensagem
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Método não permitido' }), { 
+        status: 405,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Criar o cliente Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const payload: WhatsAppPayload = await req.json()
+    console.log('Payload recebido:', JSON.stringify(payload))
+    
+    // Processar mensagens
+    if (!payload.entry || payload.entry.length === 0) {
+      return new Response(JSON.stringify({ status: 'received but no entries' }), { 
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    for (const entry of payload.entry) {
+      for (const change of entry.changes) {
+        if (change.value?.messages) {
+          for (const message of change.value.messages) {
+            // Processar mensagem baseado no tipo
+            await processMessage(message, supabase)
+          }
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ status: 'received' }), { 
+      headers: { 'Content-Type': 'application/json' }
+    })
   } catch (error) {
-    console.error("Error processing webhook:", error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.error('Erro ao processar webhook:', error)
+    return new Response(JSON.stringify({ error: error.message }), { 
       status: 500,
-    });
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 })
+
+async function processMessage(message: WhatsAppMessage, supabase: any) {
+  const phone = message.from
+  console.log(`Processando mensagem do telefone: ${phone}, tipo: ${message.type}`)
+  
+  // Identificar o motorista pelo telefone
+  const { data: motorista, error: motoristaError } = await supabase
+    .from('motoristas')
+    .select('*')
+    .eq('telefone', phone)
+    .single()
+  
+  if (motoristaError) {
+    console.error('Erro ao buscar motorista:', motoristaError)
+    return
+  }
+  
+  if (!motorista) {
+    console.log(`Nenhum motorista encontrado para o telefone ${phone}`)
+    return
+  }
+  
+  // Processar baseado no tipo de mensagem
+  if (message.type === 'location' && message.location) {
+    // Atualizar localização do motorista
+    const { error: updateError } = await supabase
+      .from('motoristas')
+      .update({
+        ultima_lat: message.location.latitude,
+        ultima_lng: message.location.longitude,
+        atualizado_em: new Date().toISOString()
+      })
+      .eq('id', motorista.id)
+    
+    if (updateError) {
+      console.error('Erro ao atualizar localização:', updateError)
+    } else {
+      console.log(`Localização do motorista ${motorista.nome} atualizada com sucesso`)
+    }
+  } else if (message.type === 'text' && message.text) {
+    // Processar comandos de texto
+    const text = message.text.body.trim()
+    
+    // Verificar se é um número de conhecimento
+    if (/^\d+$/.test(text)) {
+      console.log(`Processando número de conhecimento: ${text}`)
+      
+      // Buscar carga pelo número do conhecimento
+      const { data: carga, error: cargaError } = await supabase
+        .from('cargas')
+        .select('*')
+        .eq('numero_conhecimento', text)
+        .eq('motorista_id', motorista.id)
+        .single()
+      
+      if (cargaError) {
+        console.error('Erro ao buscar carga:', cargaError)
+        return
+      }
+      
+      if (!carga) {
+        console.log(`Nenhuma carga encontrada para o conhecimento ${text}`)
+        return
+      }
+      
+      // Atualizar status da carga para em trânsito
+      if (carga.status === 'loading') {
+        const { error: updateError } = await supabase
+          .from('cargas')
+          .update({
+            status: 'in_transit'
+          })
+          .eq('id', carga.id)
+        
+        if (updateError) {
+          console.error('Erro ao atualizar status da carga:', updateError)
+        } else {
+          console.log(`Status da carga ${carga.numero_conhecimento} atualizado para em trânsito`)
+        }
+      }
+    }
+  } else if (message.type === 'image' && message.image) {
+    // Aqui poderia processar imagens como canhoto de entrega
+    console.log(`Imagem recebida do motorista ${motorista.nome}`)
+    // Implementação para salvar imagem e atualizar carga ficaria aqui
+  }
+}
