@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -51,6 +52,32 @@ export default {
 				card: {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
+				},
+				tabata: {
+					50: '#eef3ff',
+					100: '#e0e9ff',
+					200: '#c6d5ff',
+					300: '#a3b8ff',
+					400: '#7b90ff',
+					500: '#5662ff',
+					600: '#3a3ef7',
+					700: '#2c2de3',
+					800: '#2829b8',
+					900: '#252a91',
+					950: '#18184d',
+				},
+				cargo: {
+					50: '#eefcf8',
+					100: '#d5f5ed',
+					200: '#afeadd',
+					300: '#76d6c7',
+					400: '#43baac',
+					500: '#299b91',
+					600: '#1f7e77',
+					700: '#1d6560',
+					800: '#1c514e',
+					900: '#1a4441',
+					950: '#0a2928',
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
