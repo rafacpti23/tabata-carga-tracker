@@ -14,6 +14,16 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-tabata-50 to-cargo-50">
       <div className="p-4 sm:p-6 md:p-8 w-full max-w-md">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/truck-logo.png" 
+              alt="Logo Tabata Transportes" 
+              className="h-20 w-auto"
+              onError={(e) => {
+                e.currentTarget.src = "https://placehold.co/200x100/tabata/white?text=Tabata";
+              }}
+            />
+          </div>
           <h1 className="text-3xl font-bold text-tabata-800 mb-2">Tabata Transportes</h1>
           <p className="text-gray-600">Sistema de Controle de Cargas</p>
         </div>

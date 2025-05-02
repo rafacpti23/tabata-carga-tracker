@@ -97,8 +97,9 @@ export function AuthForm() {
           </Button>
           
           <div className="text-sm text-center text-gray-500">
-            <p>Usuário padrão: tabata@ramelseg.com.br</p>
-            <p>Senha: Ramel@2025</p>
+            <p>Usuários padrão:</p>
+            <p>Email: tabata@ramelseg.com.br | Senha: Ramel@2025</p>
+            <p>Email: admin@admin.com | Senha: 123456</p>
           </div>
         </form>
       </Form>
