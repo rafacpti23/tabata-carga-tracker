@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { Card } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -50,7 +52,7 @@ export function AuthForm() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <Card className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -58,13 +60,14 @@ export function AuthForm() {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel className="dark:text-gray-200">Email</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder="seu@email.com" 
                     {...field} 
                     autoComplete="email"
                     disabled={isLoading}
+                    className="dark:bg-gray-700 dark:text-white dark:border-gray-600"
                   />
                 </FormControl>
                 <FormMessage />
@@ -77,7 +80,7 @@ export function AuthForm() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Senha</FormLabel>
+                <FormLabel className="dark:text-gray-200">Senha</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder="••••••••" 
@@ -85,6 +88,7 @@ export function AuthForm() {
                     {...field} 
                     autoComplete="current-password"
                     disabled={isLoading}
+                    className="dark:bg-gray-700 dark:text-white dark:border-gray-600"
                   />
                 </FormControl>
                 <FormMessage />
@@ -93,16 +97,21 @@ export function AuthForm() {
           />
           
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Entrando..." : "Entrar"}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Entrando...
+              </>
+            ) : "Entrar"}
           </Button>
           
-          <div className="text-sm text-center text-gray-500">
+          <div className="text-sm text-center text-gray-500 dark:text-gray-400">
             <p>Usuários padrão:</p>
             <p>Email: tabata@ramelseg.com.br | Senha: Ramel@2025</p>
             <p>Email: admin@admin.com | Senha: 123456</p>
           </div>
         </form>
       </Form>
-    </div>
+    </Card>
   );
 }

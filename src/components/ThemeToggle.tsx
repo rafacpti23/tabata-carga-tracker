@@ -34,7 +34,7 @@ export function ThemeToggle() {
       variant="ghost" 
       size="icon" 
       onClick={toggleTheme}
-      className="text-white/80 hover:text-white hover:bg-tabata-700"
+      className="text-white hover:text-white hover:bg-white/20"
       title={isDarkMode ? "Mudar para modo claro" : "Mudar para modo escuro"}
     >
       {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
