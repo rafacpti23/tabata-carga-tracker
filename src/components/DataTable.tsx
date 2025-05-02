@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface DataTableProps<T> {
   data: T[];
@@ -24,6 +25,7 @@ interface DataTableProps<T> {
     onChange: (value: string) => void;
     placeholder?: string;
   };
+  isLoading?: boolean;
 }
 
 export function DataTable<T>({
@@ -31,6 +33,7 @@ export function DataTable<T>({
   columns,
   onRowClick,
   filter,
+  isLoading = false,
 }: DataTableProps<T>) {
   return (
     <div className="space-y-4">
@@ -41,12 +44,14 @@ export function DataTable<T>({
             value={filter.value}
             onChange={(e) => filter.onChange(e.target.value)}
             className="max-w-xs"
+            disabled={isLoading}
           />
           {filter.value && (
             <Button
               variant="ghost"
               onClick={() => filter.onChange("")}
               className="h-10"
+              disabled={isLoading}
             >
               Limpar
             </Button>
@@ -63,7 +68,19 @@ export function DataTable<T>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  <div className="flex justify-center items-center">
+                    <Loader2 className="h-6 w-6 text-muted-foreground animate-spin mr-2" />
+                    <span>Carregando dados...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : data.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
