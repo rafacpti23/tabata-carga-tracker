@@ -9,16 +9,122 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      cargas: {
+        Row: {
+          criado_em: string
+          foto_canhoto_url: string | null
+          hora_descarga: string | null
+          hora_inicio: string
+          id: string
+          km_inicial: number
+          local_carregamento: string
+          local_descarga: string
+          motorista_id: string
+          numero_conhecimento: string
+          status: string
+          valor_viagem: number
+        }
+        Insert: {
+          criado_em?: string
+          foto_canhoto_url?: string | null
+          hora_descarga?: string | null
+          hora_inicio?: string
+          id?: string
+          km_inicial: number
+          local_carregamento: string
+          local_descarga: string
+          motorista_id: string
+          numero_conhecimento: string
+          status?: string
+          valor_viagem: number
+        }
+        Update: {
+          criado_em?: string
+          foto_canhoto_url?: string | null
+          hora_descarga?: string | null
+          hora_inicio?: string
+          id?: string
+          km_inicial?: number
+          local_carregamento?: string
+          local_descarga?: string
+          motorista_id?: string
+          numero_conhecimento?: string
+          status?: string
+          valor_viagem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cargas_motorista_id_fkey"
+            columns: ["motorista_id"]
+            isOneToOne: false
+            referencedRelation: "motoristas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      motoristas: {
+        Row: {
+          atualizado_em: string | null
+          cpf: string
+          id: string
+          nome: string
+          placa_cavalo: string
+          telefone: string
+          ultima_lat: number | null
+          ultima_lng: number | null
+        }
+        Insert: {
+          atualizado_em?: string | null
+          cpf: string
+          id?: string
+          nome: string
+          placa_cavalo: string
+          telefone: string
+          ultima_lat?: number | null
+          ultima_lng?: number | null
+        }
+        Update: {
+          atualizado_em?: string | null
+          cpf?: string
+          id?: string
+          nome?: string
+          placa_cavalo?: string
+          telefone?: string
+          ultima_lat?: number | null
+          ultima_lng?: number | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          email: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          email: string
+          id: string
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          email?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { user_id: string }
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
     }
     Enums: {
-      [_ in never]: never
+      user_role: "admin" | "operator" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +239,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["admin", "operator", "viewer"],
+    },
   },
 } as const
