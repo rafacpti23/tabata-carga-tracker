@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,8 +71,8 @@ interface CargoType {
   hora_descarga?: string;
 }
 
-// Definir um tipo específico para os papéis de usuário
-type UserRole = 'viewer' | 'editor' | 'admin';
+// Definir um tipo específico para os papéis de usuário que corresponda ao tipo definido no banco de dados
+type UserRole = 'viewer' | 'admin' | 'operator';
 
 export default function Settings() {
   const [webhookUrl, setWebhookUrl] = useState('');
@@ -370,7 +369,7 @@ export default function Settings() {
                         onChange={(e) => setNewUserRole(e.target.value as UserRole)}
                       >
                         <option value="viewer">Visualizador</option>
-                        <option value="editor">Editor</option>
+                        <option value="operator">Operador</option>
                         <option value="admin">Administrador</option>
                       </select>
                     </div>
@@ -411,11 +410,11 @@ export default function Settings() {
                             <TableCell>
                               <Badge variant={
                                 user.role === 'admin' ? "destructive" : 
-                                user.role === 'editor' ? "outline" : 
+                                user.role === 'operator' ? "outline" : 
                                 "secondary"
                               }>
                                 {user.role === 'admin' ? "Administrador" : 
-                                 user.role === 'editor' ? "Editor" : 
+                                 user.role === 'operator' ? "Operador" : 
                                  "Visualizador"}
                               </Badge>
                             </TableCell>
@@ -440,10 +439,10 @@ export default function Settings() {
                                     Definir como Visualizador
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
-                                    onClick={() => handleUpdateUserRole(user.id, 'editor')}
-                                    disabled={user.role === 'editor'}
+                                    onClick={() => handleUpdateUserRole(user.id, 'operator')}
+                                    disabled={user.role === 'operator'}
                                   >
-                                    Definir como Editor
+                                    Definir como Operador
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     onClick={() => handleUpdateUserRole(user.id, 'admin')}
