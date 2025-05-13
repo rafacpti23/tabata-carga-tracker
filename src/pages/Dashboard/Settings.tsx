@@ -72,6 +72,9 @@ interface CargoType {
   hora_descarga?: string;
 }
 
+// Definir um tipo específico para os papéis de usuário
+type UserRole = 'viewer' | 'editor' | 'admin';
+
 export default function Settings() {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [isWebhookUrlSaving, setIsWebhookUrlSaving] = useState(false);
@@ -80,7 +83,7 @@ export default function Settings() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState('viewer');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('viewer');
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   
@@ -364,7 +367,7 @@ export default function Settings() {
                         id="role"
                         className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                         value={newUserRole}
-                        onChange={(e) => setNewUserRole(e.target.value)}
+                        onChange={(e) => setNewUserRole(e.target.value as UserRole)}
                       >
                         <option value="viewer">Visualizador</option>
                         <option value="editor">Editor</option>
