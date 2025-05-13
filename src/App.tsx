@@ -14,6 +14,7 @@ import DashboardLayout from "./pages/Dashboard/DashboardLayout";
 import Home from "./pages/Dashboard/Home";
 import Drivers from "./pages/Dashboard/Drivers";
 import Cargos from "./pages/Dashboard/Cargos";
+import Settings from "./pages/Dashboard/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const AppRoutes = () => {
         <Route index element={<Home />} />
         <Route path="motoristas" element={<Drivers />} />
         <Route path="cargas" element={<Cargos />} />
+        <Route path="configuracoes" element={<Settings />} />
       </Route>
       
       {/* Catch-all route */}

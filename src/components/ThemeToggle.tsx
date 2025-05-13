@@ -29,12 +29,28 @@ export function ThemeToggle() {
     }
   };
 
+  const getButtonClass = () => {
+    const baseClasses = "hover:bg-white/20";
+    
+    // Se estiver na página de login (fundo escuro)
+    if (window.location.pathname.includes("login")) {
+      return `${baseClasses} text-white hover:text-white`;
+    }
+    
+    // Se estiver no dashboard
+    if (isDarkMode) {
+      return `${baseClasses} text-white hover:text-white`;
+    } else {
+      return `${baseClasses} text-gray-700 hover:text-gray-900`;
+    }
+  };
+
   return (
     <Button 
       variant="ghost" 
       size="icon" 
       onClick={toggleTheme}
-      className="text-white hover:text-white hover:bg-white/20"
+      className={getButtonClass()}
       title={isDarkMode ? "Mudar para modo claro" : "Mudar para modo escuro"}
     >
       {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
