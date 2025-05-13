@@ -33,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface UserType {
   id: string;
@@ -41,11 +42,14 @@ interface UserType {
   created_at: string;
 }
 
+// Define a type for user roles to match what's expected in the database
+type UserRole = 'viewer' | 'operator' | 'admin';
+
 export default function UserManagement() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState('viewer');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('viewer');
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   
@@ -135,7 +139,7 @@ export default function UserManagement() {
     }
   };
   
-  const handleUpdateUserRole = async (userId: string, newRole: string) => {
+  const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -227,16 +231,19 @@ export default function UserManagement() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="role">Papel</Label>
-                <select 
-                  id="role"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value)}
+                <Select 
+                  value={newUserRole} 
+                  onValueChange={(value: UserRole) => setNewUserRole(value)}
                 >
-                  <option value="viewer">Visualizador</option>
-                  <option value="operator">Operador</option>
-                  <option value="admin">Administrador</option>
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um papel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="viewer">Visualizador</SelectItem>
+                    <SelectItem value="operator">Operador</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>
