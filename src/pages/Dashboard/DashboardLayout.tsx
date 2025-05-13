@@ -41,7 +41,7 @@ export default function DashboardLayout() {
         >
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </Button>
-        <span className="font-semibold">Tabata Transportes</span>
+        <span className="font-semibold">TabShipping</span>
       </div>
 
       {/* Sidebar */}
@@ -55,13 +55,13 @@ export default function DashboardLayout() {
           <div className="flex flex-col items-center w-full">
             <img 
               src="https://tobematransportadora.com.br/wp-content/uploads/2020/02/logo-do-rodape.png" 
-              alt="Logo Tabata Transportes" 
+              alt="Logo TabShipping" 
               className="h-12 w-auto mb-2"
               onError={(e) => {
-                e.currentTarget.src = "https://placehold.co/200x100/tabata/white?text=Tabata";
+                e.currentTarget.src = "https://placehold.co/200x100/tabata/white?text=TabShipping";
               }}
             />
-            <h1 className="text-xl font-bold">Tabata Transportes</h1>
+            <h1 className="text-xl font-bold">TabShipping</h1>
           </div>
         </div>
 

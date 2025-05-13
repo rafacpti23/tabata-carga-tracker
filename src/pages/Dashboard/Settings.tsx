@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -24,12 +25,21 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { useState as hookState } from 'react';
 
 export default function Settings() {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [isWebhookUrlSaving, setIsWebhookUrlSaving] = useState(false);
   const [isTestingSending, setIsTestingSending] = useState(false);
+  const [showMapOnDashboard, setShowMapOnDashboard] = useState(true);
+  
+  // Load stored settings when component mounts
+  useEffect(() => {
+    const storedWebhookUrl = localStorage.getItem('webhookUrl') || '';
+    const storedShowMap = localStorage.getItem('showMapOnDashboard') !== 'false'; // Default to true
+    
+    setWebhookUrl(storedWebhookUrl);
+    setShowMapOnDashboard(storedShowMap);
+  }, []);
   
   const handleSaveWebhookUrl = async () => {
     if (!webhookUrl) {
@@ -44,8 +54,7 @@ export default function Settings() {
     try {
       setIsWebhookUrlSaving(true);
       
-      // Salvar webhook URL no localStorage por enquanto
-      // Em uma implementação real, isso seria salvo no banco de dados
+      // Save webhook URL to localStorage
       localStorage.setItem('webhookUrl', webhookUrl);
       
       toast({
@@ -79,8 +88,7 @@ export default function Settings() {
     try {
       setIsTestingSending(true);
       
-      // Simular envio de teste
-      // Em uma implementação real, isso enviaria uma solicitação HTTP para o webhook
+      // Simulate test send
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       toast({
@@ -97,6 +105,18 @@ export default function Settings() {
     } finally {
       setIsTestingSending(false);
     }
+  };
+  
+  const handleToggleMap = (checked: boolean) => {
+    setShowMapOnDashboard(checked);
+    localStorage.setItem('showMapOnDashboard', checked.toString());
+    
+    toast({
+      title: checked ? "Mapa ativado" : "Mapa desativado",
+      description: checked ? 
+        "O mapa será exibido no dashboard." : 
+        "O mapa foi removido do dashboard.",
+    });
   };
   
   return (
@@ -162,6 +182,22 @@ export default function Settings() {
               <CardTitle>Configurações do Sistema</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="show-map">Exibir Mapa no Dashboard</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Ativar ou desativar a exibição do mapa na página inicial.
+                    </p>
+                  </div>
+                  <Switch 
+                    id="show-map"
+                    checked={showMapOnDashboard}
+                    onCheckedChange={handleToggleMap}
+                  />
+                </div>
+              </div>
+              
               <div className="space-y-2">
                 <Label>Versão do Sistema</Label>
                 <p className="text-sm">1.0.0</p>
@@ -169,7 +205,27 @@ export default function Settings() {
               
               <div className="space-y-2">
                 <Label>Empresa</Label>
-                <p className="text-sm">Tobema Transportes</p>
+                <p className="text-sm">TabShipping</p>
+              </div>
+              
+              <div className="mt-8 pt-4 border-t">
+                <h3 className="text-sm font-medium mb-2">Suporte</h3>
+                <p className="text-sm">
+                  Para suporte técnico, entre em contato com:
+                </p>
+                <p className="text-sm font-semibold mt-1">
+                  <a 
+                    href="https://ramelseg.com.br" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    Ramel Tecnologia
+                  </a>
+                </p>
+                <p className="text-xs text-muted-foreground mt-4">
+                  &copy; {new Date().getFullYear()} TabShipping - Desenvolvido por Ramel Tecnologia
+                </p>
               </div>
             </CardContent>
           </Card>

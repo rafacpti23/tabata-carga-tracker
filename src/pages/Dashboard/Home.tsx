@@ -10,12 +10,38 @@ import { Package, Truck, BarChart3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { 
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent
+} from '@/components/ui/chart';
+import { 
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer, 
+  Legend, 
+  Tooltip
+} from 'recharts';
 
 export default function Home() {
   const [filterText, setFilterText] = useState("");
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showMap, setShowMap] = useState(true);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
+  
+  useEffect(() => {
+    // Load map visibility preference
+    const storedShowMap = localStorage.getItem('showMapOnDashboard');
+    if (storedShowMap !== null) {
+      setShowMap(storedShowMap !== 'false');
+    }
+  }, []);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -53,6 +79,9 @@ export default function Home() {
         
         setDrivers(driversData as Driver[]);
         setCargos(cargosData as Cargo[]);
+
+        // Generate chart data
+        generateChartData(cargosData as Cargo[], chartPeriod);
       } catch (error: any) {
         toast({
           variant: "destructive",
@@ -84,7 +113,6 @@ export default function Home() {
       })
       .subscribe();
       
-    // Set up real-time subscription for cargos updates
     const cargosSubscription = supabase
       .channel('cargas-changes')
       .on('postgres_changes', {
@@ -94,14 +122,20 @@ export default function Home() {
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
           // Add new cargo to state
-          setCargos(currentCargos => [payload.new as Cargo, ...currentCargos]);
+          setCargos(currentCargos => {
+            const newCargos = [payload.new as Cargo, ...currentCargos];
+            generateChartData(newCargos, chartPeriod);
+            return newCargos;
+          });
         } else if (payload.eventType === 'UPDATE') {
           // Update cargo in state
           setCargos(currentCargos => {
             const updatedCargo = payload.new as Cargo;
-            return currentCargos.map(cargo => 
+            const newCargos = currentCargos.map(cargo => 
               cargo.id === updatedCargo.id ? updatedCargo : cargo
             );
+            generateChartData(newCargos, chartPeriod);
+            return newCargos;
           });
         }
       })
@@ -113,6 +147,73 @@ export default function Home() {
     };
   }, []);
   
+  // Generate chart data when period changes
+  useEffect(() => {
+    generateChartData(cargos, chartPeriod);
+  }, [chartPeriod, cargos]);
+  
+  // Function to generate chart data based on selected period
+  const generateChartData = (cargos: Cargo[], period: 'week' | 'month') => {
+    if (!cargos.length) return;
+    
+    const now = new Date();
+    const data: any[] = [];
+    
+    if (period === 'week') {
+      // Create data for the last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        
+        const dayStr = date.toLocaleDateString('pt-BR', { weekday: 'short' });
+        const dayKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        const dayDeliveries = cargos.filter(cargo => {
+          if (!cargo.hora_descarga) return false;
+          const descargaDate = new Date(cargo.hora_descarga);
+          return descargaDate.toISOString().split('T')[0] === dayKey;
+        });
+        
+        const totalValue = dayDeliveries.reduce((sum, cargo) => sum + cargo.valor_viagem, 0);
+        const count = dayDeliveries.length;
+        
+        data.push({
+          name: dayStr,
+          ganhos: totalValue,
+          quantidade: count
+        });
+      }
+    } else {
+      // Create data for the last 4 weeks
+      for (let i = 3; i >= 0; i--) {
+        const startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - (i * 7) - 6);
+        const endDate = new Date(now);
+        endDate.setDate(endDate.getDate() - (i * 7));
+        
+        const weekLabel = `${startDate.getDate()}/${startDate.getMonth() + 1} - ${endDate.getDate()}/${endDate.getMonth() + 1}`;
+        
+        const weekDeliveries = cargos.filter(cargo => {
+          if (!cargo.hora_descarga) return false;
+          const descargaDate = new Date(cargo.hora_descarga);
+          return descargaDate >= startDate && descargaDate <= endDate;
+        });
+        
+        const totalValue = weekDeliveries.reduce((sum, cargo) => sum + cargo.valor_viagem, 0);
+        const count = weekDeliveries.length;
+        
+        data.push({
+          name: weekLabel,
+          ganhos: totalValue,
+          quantidade: count
+        });
+      }
+    }
+    
+    setChartData(data);
+  };
+  
+  // Calculate stats
   const driversActive = drivers.length;
   const driversOnline = drivers.filter(d => d.ultima_lat && d.ultima_lng).length;
   const cargosInTransit = cargos.filter(c => c.status === 'in_transit').length;
@@ -296,10 +397,83 @@ export default function Home() {
           </Tabs>
         </div>
 
-        <Card className="h-[400px]">
-          <DriversMap drivers={drivers} />
-        </Card>
+        {showMap ? (
+          <Card className="h-[400px]">
+            <DriversMap drivers={drivers} />
+          </Card>
+        ) : (
+          <Card className="h-[400px] flex flex-col">
+            <CardHeader className="pb-2">
+              <CardTitle>Desempenho de Fretes</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col">
+              <div className="mb-2 flex justify-end">
+                <TabsList className="h-8">
+                  <TabsTrigger 
+                    className="text-xs h-7 px-2"
+                    value="week" 
+                    onClick={() => setChartPeriod('week')}
+                    data-state={chartPeriod === 'week' ? 'active' : ''}
+                  >
+                    Semanal
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    className="text-xs h-7 px-2"
+                    value="month" 
+                    onClick={() => setChartPeriod('month')}
+                    data-state={chartPeriod === 'month' ? 'active' : ''}
+                  >
+                    Mensal
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              
+              <div className="flex-1 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                    <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="ganhos" name="Ganhos (R$)" fill="#8884d8" />
+                    <Bar yAxisId="right" dataKey="quantidade" name="Quantidade" fill="#82ca9d" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+      
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle>Análise de Desempenho</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={chartData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                <Tooltip />
+                <Legend />
+                <Bar yAxisId="left" dataKey="ganhos" name="Ganhos (R$)" fill="#8884d8" />
+                <Bar yAxisId="right" dataKey="quantidade" name="Quantidade" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

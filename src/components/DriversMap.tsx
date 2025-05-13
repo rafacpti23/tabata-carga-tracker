@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useMemo } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Driver } from '@/lib/types';
 
 interface DriversMapProps {
@@ -10,8 +10,8 @@ interface DriversMapProps {
 
 export function DriversMap({ drivers }: DriversMapProps) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<{[key: string]: mapboxgl.Marker}>({});
+  const map = useRef<L.Map | null>(null);
+  const markersRef = useRef<{[key: string]: L.Marker}>({});
   
   const driversWithLocation = useMemo(() => 
     drivers.filter(driver => 
@@ -26,41 +26,28 @@ export function DriversMap({ drivers }: DriversMapProps) {
   );
 
   useEffect(() => {
-    // Verifica se a API key do Mapbox está definida
-    const mapboxToken = 'pk.eyJ1IjoiYXJyYXlyYWN0aWZpZXIiLCJhIjoiY2xtNHkzaTN0MGlvNzNkbWgyeGl5ZGwwYyJ9.6PR-ci3gCfWGssa6LR9Wcg';
-    
-    if (!mapboxToken) {
-      console.error("Mapbox token não definido");
-      return;
-    }
-
-    mapboxgl.accessToken = mapboxToken;
-
-    try {
-      // Inicializa o mapa se o container existir e o mapa ainda não foi criado
-      if (mapContainer.current && !map.current) {
-        map.current = new mapboxgl.Map({
-          container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: [-49.2, -16.6], // Centro no Brasil
-          zoom: 4
-        });
-
-        // Adiciona controles de navegação
-        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // Initialize the map if the container exists and the map hasn't been created yet
+    if (mapContainer.current && !map.current) {
+      try {
+        map.current = L.map(mapContainer.current).setView([-16.6, -49.2], 4);
+        
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map.current);
+      } catch (error) {
+        console.error("Error initializing map:", error);
       }
-    } catch (error) {
-      console.error("Erro ao inicializar o mapa:", error);
     }
 
     return () => {
-      // Limpa os marcadores e o mapa quando o componente for desmontado
+      // Clean up markers and map when component is unmounted
       Object.values(markersRef.current).forEach(marker => marker.remove());
       if (map.current) {
         try {
           map.current.remove();
         } catch (error) {
-          console.error("Erro ao remover o mapa:", error);
+          console.error("Error removing map:", error);
         }
         map.current = null;
       }
@@ -71,11 +58,11 @@ export function DriversMap({ drivers }: DriversMapProps) {
     if (!map.current) return;
 
     try {
-      // Remove os marcadores antigos
+      // Remove old markers
       Object.values(markersRef.current).forEach(marker => marker.remove());
       markersRef.current = {};
 
-      // Adiciona os novos marcadores
+      // Add new markers for each driver with valid location
       driversWithLocation.forEach(driver => {
         if (!driver.ultima_lat || !driver.ultima_lng || 
             typeof driver.ultima_lat !== 'number' || 
@@ -85,67 +72,57 @@ export function DriversMap({ drivers }: DriversMapProps) {
           return;
         }
 
-        // Cria um elemento para o marcador
-        const el = document.createElement('div');
-        el.className = 'driver-marker';
-        el.style.backgroundColor = '#3FB1CE';
-        el.style.width = '20px';
-        el.style.height = '20px';
-        el.style.borderRadius = '50%';
-        el.style.border = '2px solid white';
-        el.style.cursor = 'pointer';
+        try {
+          // Create custom icon for the driver marker
+          const driverIcon = L.divIcon({
+            className: 'driver-marker',
+            html: `<div style="background-color: #3FB1CE; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+          });
 
-        // Cria o popup com informações do motorista
-        const popup = new mapboxgl.Popup({ offset: 25 })
-          .setHTML(`
+          // Create and add marker to the map
+          const marker = L.marker([driver.ultima_lat, driver.ultima_lng], {
+            icon: driverIcon
+          }).addTo(map.current!);
+
+          // Add popup with driver info
+          marker.bindPopup(`
             <div>
-              <h3 class="font-bold">${driver.nome}</h3>
+              <h3 style="font-weight: bold">${driver.nome}</h3>
               <p>Placa: ${driver.placa_cavalo}</p>
               <p>Telefone: ${driver.telefone}</p>
             </div>
           `);
 
-        try {
-          // Cria e adiciona o marcador ao mapa
-          const marker = new mapboxgl.Marker(el)
-            .setLngLat([driver.ultima_lng, driver.ultima_lat])
-            .setPopup(popup)
-            .addTo(map.current!);
-
-          // Armazena a referência do marcador
+          // Store marker reference
           markersRef.current[driver.id] = marker;
         } catch (error) {
-          console.error(`Erro ao adicionar marcador para motorista ${driver.id}:`, error);
+          console.error(`Error adding marker for driver ${driver.id}:`, error);
         }
       });
 
-      // Ajusta o zoom e centraliza o mapa se houver motoristas
+      // Adjust zoom and center the map if there are drivers
       if (driversWithLocation.length > 0) {
         try {
-          const bounds = new mapboxgl.LngLatBounds();
-          let hasValidCoordinates = false;
+          const bounds = L.latLngBounds(
+            driversWithLocation
+              .filter(d => d.ultima_lat && d.ultima_lng && !isNaN(d.ultima_lat) && !isNaN(d.ultima_lng))
+              .map(d => [d.ultima_lat as number, d.ultima_lng as number])
+          );
           
-          driversWithLocation.forEach(driver => {
-            if (driver.ultima_lat && driver.ultima_lng && 
-                !isNaN(driver.ultima_lat) && !isNaN(driver.ultima_lng)) {
-              bounds.extend([driver.ultima_lng, driver.ultima_lat]);
-              hasValidCoordinates = true;
-            }
-          });
-          
-          if (hasValidCoordinates) {
+          if (bounds.isValid()) {
             map.current.fitBounds(bounds, {
-              padding: 50,
-              maxZoom: 15,
-              duration: 1000
+              padding: [50, 50],
+              maxZoom: 15
             });
           }
         } catch (error) {
-          console.error("Erro ao ajustar limites do mapa:", error);
+          console.error("Error adjusting map bounds:", error);
         }
       }
     } catch (error) {
-      console.error("Erro no gerenciamento de marcadores:", error);
+      console.error("Error managing markers:", error);
     }
   }, [driversWithLocation]);
 
