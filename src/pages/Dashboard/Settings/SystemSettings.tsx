@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label";
 import { toast } from '@/hooks/use-toast';
 
 export default function SystemSettings() {
-  const [showMapOnDashboard, setShowMapOnDashboard] = useState(true);
+  const [showMapOnDashboard, setShowMapOnDashboard] = useState(false);
   
   // Load stored settings when component mounts
   useEffect(() => {
-    const storedShowMap = localStorage.getItem('showMapOnDashboard') !== 'false'; // Default to true
+    const storedShowMap = localStorage.getItem('showMapOnDashboard') === 'true'; // Default to false
     setShowMapOnDashboard(storedShowMap);
   }, []);
   
@@ -55,7 +55,7 @@ export default function SystemSettings() {
         
         <div className="space-y-2">
           <Label>Empresa</Label>
-          <p className="text-sm">TabShipping</p>
+          <p className="text-sm">TobShipping</p>
         </div>
         
         <div className="mt-8 pt-4 border-t">
@@ -74,7 +74,7 @@ export default function SystemSettings() {
             </a>
           </p>
           <p className="text-xs text-muted-foreground mt-4">
-            &copy; {new Date().getFullYear()} TabShipping - Desenvolvido por Ramel Tecnologia
+            &copy; {new Date().getFullYear()} TobShipping - Desenvolvido por Ramel Tecnologia
           </p>
         </div>
       </CardContent>
